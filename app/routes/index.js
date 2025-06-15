@@ -7,7 +7,7 @@ module.exports = (app, express) => {
   router.use('/users',authenticate, require('../routes/auth.routes'));
   router.use('/appointments', authenticate, require('../routes/appointment.route'));
   router.use('/patient-summary', authenticate, require('./patientSummary.route'));
-  // router.use('/analytics', authenticate, require('./analyticsRoutes'));
+  router.use('/analytics', authenticate, require('./analytics.routes.js'));
 
   app.use('/api', router);
 };

@@ -3,7 +3,6 @@ const db = require("../models")
 const User = db.users
 
 const authenticate = async (req, res, next) => {
-  console.log("Authorization header:", req);
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
 
