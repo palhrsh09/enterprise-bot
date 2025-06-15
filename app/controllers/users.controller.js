@@ -3,9 +3,13 @@ const db = require("../models")
 const User = db.users;
 const PatientSummary = db.patientSummary
 
-const generateToken = (userId) => {
+const generateToken = (userId,email,role) => {
   return jwt.sign(
-    { userId },
+   {
+    _id: userId,
+    email: email,
+    role: role
+  },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
   );
@@ -38,7 +42,7 @@ const register = async (req, res) => {
       await patientSummary.save();
     }
 
-    const token = generateToken(user._id);
+    const token = generateToken(user?._id,user?.email,user.role);
 
     res.status(201).json({
       message: 'User registered successfully',
@@ -67,7 +71,7 @@ const login = async (req, res) => {
     user.lastLogin = new Date();
     await user.save();
 
-    const token = generateToken(user._id);
+    const token = generateToken(user?._id,user?.email,user.role);
 
     res.json({
       message: 'Login successful',
