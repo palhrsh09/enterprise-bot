@@ -5,4 +5,6 @@ router.get("/:id", appointment.getAppointmentById);
 router.post("/", appointment.createAppointment);
 router.put("/:id", appointment.updateAppointment);
 router.delete("/:id", appointment.deleteAppointment);
+router.get("/:id", appointment.getAppointmentReport)
+
 module.exports = router;

@@ -17,7 +17,7 @@ const PubSubClient = require("../services/socket.service");
 const app = express();
 const server = http.createServer(app);
 
-global.pubsub = new PubSubClient('ws://localhost:4000');
+global.pubsub = new PubSubClient('ws://localhost:8091');
 global.pubsub.connect().catch(console.error);
 
 // Logger

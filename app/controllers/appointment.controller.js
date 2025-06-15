@@ -2,7 +2,8 @@ const db = require("../models")
 const Appointment = db.appointment
 const User = db.users
 const moment = require('moment');
-const mongoose = require("mongoose")
+const mongoose = require("mongoose");
+const generateAppointmentReport = require("../scripts/generateReports");
 
 const createAppointment = async (req, res) => {
   try {
@@ -240,11 +241,37 @@ const deleteAppointment = async (req, res) => {
     res.status(500).json({ message: 'Failed to delete appointment', error: error.message });
   }
 };
+const getAppointmentReport = async (req, res) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id)
+      .populate('patientId doctorId', 'name email')
+      .lean();
+
+    if (!appointment) {
+      return res.status(404).json({ message: 'Appointment not found' });
+    }
+
+    if (appointment.status !== 'completed') {
+      return res.status(400).json({ message: 'Report can only be generated for completed appointments' });
+    }
+
+    const pdfStream = generateAppointmentReport(appointment);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=appointment-${appointment._id}.pdf`);
+    
+    pdfStream.pipe(res);
+
+  } catch (err) {
+    console.error('Error generating report:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+}
 
 module.exports = {
   createAppointment,
   getAppointments,
   getAppointmentById,
   updateAppointment,
-  deleteAppointment
+  deleteAppointment,
+  getAppointmentReport
 };

@@ -71,7 +71,12 @@ const login = async (req, res) => {
     user.lastLogin = new Date();
     await user.save();
 
-    const token = generateToken(user?._id,user?.email,user.role);
+    const token = generateToken(user._id, user.email, user.role);
+
+    const userChannel = `user:${user._id}`;
+    global.pubsub.subscribe(userChannel, (message) => {
+      console.log(`Message for ${user.email}:`, message);
+    });
 
     res.json({
       message: 'Login successful',
@@ -118,5 +123,6 @@ module.exports = {
   register,
   login,
   getProfile,
-  updateProfile
+  updateProfile,
+  generateToken
 };
