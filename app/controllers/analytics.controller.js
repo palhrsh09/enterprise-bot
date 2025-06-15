@@ -12,8 +12,8 @@ exports.getPatientAnalytics = async (req, res) => {
   try {
     const objectId = new mongoose.Types.ObjectId(patientId);
 
-    const totalAppointments = await Appointment.countDocuments({ patient: objectId });
-
+    const totalAppointments = await Appointment.countDocuments({ patientId: objectId });
+    // console.log()
     const statusDistribution = await Appointment.aggregate([
       { $match: { patient: objectId } },
       { $group: { _id: '$status', count: { $sum: 1 } } }

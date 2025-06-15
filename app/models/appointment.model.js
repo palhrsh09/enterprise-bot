@@ -5,12 +5,12 @@ const appointmentSchema = new mongoose.Schema({
       type: mongoose.Schema.Types.ObjectId,
       default: () => new mongoose.Types.ObjectId(),
     },
-  patient: {
+  patientId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-  doctor: {
+  doctorId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
@@ -73,8 +73,8 @@ const appointmentSchema = new mongoose.Schema({
   timestamps: true
 });
 
-appointmentSchema.index({ patient: 1, dateTime: 1 });
-appointmentSchema.index({ doctor: 1, dateTime: 1 });
+appointmentSchema.index({ patientId: 1, dateTime: 1 });
+appointmentSchema.index({ doctorId: 1, dateTime: 1 });
 appointmentSchema.index({ status: 1 });
 appointmentSchema.index({ dateTime: 1 });
 

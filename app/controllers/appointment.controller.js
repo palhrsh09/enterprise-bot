@@ -2,18 +2,29 @@ const db = require("../models")
 const Appointment = db.appointment
 const User = db.users
 const moment = require('moment');
+const mongoose = require("mongoose")
 
 const createAppointment = async (req, res) => {
   try {
-    const { patient, doctor, dateTime, duration, reason, type } = req.body;
+    const { patientId, doctorId, dateTime, duration, reason, type } = req.body;
+    let convertedPatientId = patientId;
+    let convertedDoctorId = doctorId;
+    console.log("ids:",patientId,"pateint",doctorId)
+    if (patientId && !(patientId instanceof mongoose.Types.ObjectId)) {
+  convertedPatientId = new mongoose.Types.ObjectId(patientId);
+   }
+  if (doctorId && !(doctorId instanceof mongoose.Types.ObjectId)) {
+  convertedDoctorId = new mongoose.Types.ObjectId(doctorId);
+}
 
-    const doctorUser = await User.findById(doctor);
+    const doctorUser = await User.findById(convertedDoctorId);
     if (!doctorUser || doctorUser.role !== 'doctor') {
       return res.status(400).json({ message: 'Invalid doctor ID' });
     }
 
-    const patientUser = await User.findById(patient);
-    if (!patientUser || patientUser.role !== 'patient') {
+    const patientUser = await User.findById(convertedPatientId);
+    console.log("patientUser:",patientUser)
+    if (!patientUser ) {
       return res.status(400).json({ message: 'Invalid patient ID' });
     }
 
@@ -21,7 +32,7 @@ const createAppointment = async (req, res) => {
     const appointmentEnd = new Date(appointmentDate.getTime() + (duration || 30) * 60000);
 
     const conflictingAppointment = await Appointment.findOne({
-      doctor,
+      doctorId,
       status: { $nin: ['cancelled', 'completed'] },
       $or: [
         {
@@ -41,8 +52,8 @@ const createAppointment = async (req, res) => {
     }
 
     const appointment = new Appointment({
-      patient,
-      doctor,
+      patientId:convertedPatientId,   
+      doctorId:convertedDoctorId,
       dateTime: appointmentDate,
       duration: duration || 30,
       reason,
@@ -53,15 +64,16 @@ const createAppointment = async (req, res) => {
     await appointment.save();
     await appointment.populate(['patient', 'doctor', 'createdBy']);
 
-    const io = req.app.get('io');
-    io.to(`doctor-${doctor}`).emit('newAppointment', {
+   global.pubsub.publish(`doctor-${doctorId}`, {
+      type: "newAppointment",
       appointment,
-      message: `New appointment scheduled with ${patientUser.firstName} ${patientUser.lastName}`
+      message: `New appointment scheduled with ${patientUser.firstName} ${patientUser.lastName}`,
     });
 
-    io.to(`patient-${patient}`).emit('appointmentUpdate', {
+    global.pubsub.publish(`patient-${patientId}`, {
+      type: "appointmentUpdate",
       appointment,
-      message: 'Your appointment has been scheduled'
+      message: "Your appointment has been scheduled",
     });
 
     res.status(201).json({
@@ -69,26 +81,27 @@ const createAppointment = async (req, res) => {
       appointment
     });
   } catch (error) {
+    console.log("error",error)
     res.status(500).json({ message: 'Failed to create appointment', error: error.message });
   }
 };
 
 const getAppointments = async (req, res) => {
   try {
-    const { status, date, doctor, patient } = req.query;
+    const { status, date, doctorId, patientId } = req.query;
     const { role, _id } = req.user;
 
     let filter = {};
 
     if (role === 'doctor') {
-      filter.doctor = _id;
+      filter.doctorId = _id;
     } else if (role === 'patient') {
-      filter.patient = _id;
+      filter.patientId = _id;
     }
 
     if (status) filter.status = status;
-    if (doctor && role === 'admin') filter.doctor = doctor;
-    if (patient && ['admin', 'doctor'].includes(role)) filter.patient = patient;
+    if (doctorId && role === 'admin') filter.doctorId = doctorId;
+    if (patientId && ['admin', 'doctor'].includes(role)) filter.patientId = patientId;
 
     if (date) {
       const startDate = moment(date).startOf('day').toDate();
@@ -97,8 +110,8 @@ const getAppointments = async (req, res) => {
     }
 
     const appointments = await Appointment.find(filter)
-      .populate('patient', 'firstName lastName email phone')
-      .populate('doctor', 'firstName lastName email specialization')
+      .populate('patientId', 'firstName lastName email phone')
+      .populate('doctorId', 'firstName lastName email specialization')
       .populate('createdBy', 'firstName lastName')
       .sort({ dateTime: 1 });
 
@@ -107,6 +120,7 @@ const getAppointments = async (req, res) => {
     res.status(500).json({ message: 'Failed to get appointments', error: error.message });
   }
 };
+
 
 const getAppointmentById = async (req, res) => {
   try {
@@ -151,7 +165,7 @@ const updateAppointment = async (req, res) => {
       return res.status(403).json({ message: 'Patients cannot update appointments' });
     }
 
-    if (role === 'doctor' && appointment.doctor.toString() !== _id.toString()) {
+    if (role === 'doctor' && appointment.doctorId.toString() !== _id.toString()) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
@@ -168,19 +182,20 @@ const updateAppointment = async (req, res) => {
       id,
       updates,
       { new: true, runValidators: true }
-    ).populate(['patient', 'doctor']);
+    ).populate(['patientId', 'doctorId']);
 
-    if (updates.status) {
-      const io = req.app.get('io');
-      io.to(`patient-${appointment.patient}`).emit('appointmentUpdate', {
+      if (updates.status) {
+      global.pubsub.publish(`patient-${appointment.patientId}`, {
+        type: "appointmentUpdate",
         appointment: updatedAppointment,
-        message: `Your appointment status has been updated to ${updates.status}`
+        message: `Your appointment status has been updated to ${updates.status}`,
       });
 
-      if (updates.status === 'cancelled') {
-        io.to(`doctor-${appointment.doctor}`).emit('appointmentCancelled', {
+      if (updates.status === "cancelled") {
+        global.pubsub.publish(`doctor-${appointment.doctorId}`, {
+          type: "appointmentCancelled",
           appointment: updatedAppointment,
-          message: 'An appointment has been cancelled'
+          message: "An appointment has been cancelled",
         });
       }
     }
@@ -208,15 +223,16 @@ const deleteAppointment = async (req, res) => {
       return res.status(404).json({ message: 'Appointment not found' });
     }
 
-    const io = req.app.get('io');
-    io.to(`patient-${appointment.patient}`).emit('appointmentDeleted', {
+     global.pubsub.publish(`patient-${appointment.patientId}`, {
+      type: "appointmentDeleted",
       appointmentId: id,
-      message: 'Your appointment has been cancelled'
+      message: "Your appointment has been cancelled",
     });
 
-    io.to(`doctor-${appointment.doctor}`).emit('appointmentDeleted', {
+    global.pubsub.publish(`doctor-${appointment.doctorId}`, {
+      type: "appointmentDeleted",
       appointmentId: id,
-      message: 'An appointment has been cancelled'
+      message: "An appointment has been cancelled",
     });
 
     res.json({ message: 'Appointment deleted successfully' });

@@ -12,9 +12,13 @@ const errorHandler = require('../middleware/errorHandler');
 const config = require('../config/app.config');
 const dbConfig = require('../config/db.config');
 const db = require('../models');
+const PubSubClient = require("../services/socket.service");
 
 const app = express();
 const server = http.createServer(app);
+
+global.pubsub = new PubSubClient('ws://localhost:4000');
+global.pubsub.connect().catch(console.error);
 
 // Logger
 const logger = winston.createLogger({
@@ -35,9 +39,9 @@ mongoose.connect(dbConfig.URI, {
   dbName: dbConfig.DB_NAME,
 })
   .then(() => {
-    logger.info('✅ MongoDB connected successfully');
+    logger.info('MongoDB connected successfully');
   })
-  .catch((err) => logger.error('❌ MongoDB connection error:', err));
+  .catch((err) => logger.error('MongoDB connection error:', err));
 
 // CORS setup
 const whitelist = config.CORS_URLS.split(',');
@@ -65,24 +69,20 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// 🔥 Log every incoming request
 app.use((req, res, next) => {
-  console.log(`🔥 [${req.method}] ${req.originalUrl} - IP: ${req.ip}`);
+  console.log(`[${req.method}] ${req.originalUrl} - IP: ${req.ip}`);
   logger.info(`[REQ] ${req.method} ${req.originalUrl} from ${req.ip}`);
   next();
 });
 
-// ✅ Confirm routes are being registered
-console.log("🛠 Registering routes...");
+console.log("Registering routes...");
 routes(app, express);
-console.log("✅ Routes registered");
+console.log("Routes registered");
 
-// Health check route
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Error handler middleware
 app.use(errorHandler);
 
 // Optional 404 handler
